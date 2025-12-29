@@ -1,14 +1,307 @@
-import { StyleSheet } from 'react-native';
+import { useState, useEffect, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  useColorScheme,
+  RefreshControl,
+  ActivityIndicator,
+} from "react-native";
+import Toast from 'react-native-toast-message';
+import { API_URL } from "@/constants/Api";
 
-import EditScreenInfo from '@/components/EditScreenInfo';
-import { Text, View } from '@/components/Themed';
+import { useFocusEffect, useRouter } from "expo-router";
+import { Clock, CheckCircle, TrendingUp } from "lucide-react-native";
+import { type Poll } from "@/lib/types";
+import { getDeviceId } from "../utils/deviceId";
 
-export default function TabOneScreen() {
+export default function PollsScreen() {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [polls, setPolls] = useState<
+    (Poll & { yes_votes: number; no_votes: number; total_votes: number })[]
+  >([]);
+  
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchPolls(); 
+    }, [])
+  );
+  const colors = {
+    background: isDark ? "#0a0a0a" : "#f5f7fa",
+    card: isDark ? "#1a1a1a" : "#ffffff",
+    text: isDark ? "#ffffff" : "#1f2937",
+    subtext: isDark ? "#9ca3af" : "#6b7280",
+    border: isDark ? "#2a2a2a" : "#e5e7eb",
+    active: isDark ? "#10b981" : "#059669",
+    inactive: isDark ? "#ef4444" : "#dc2626",
+    primary: isDark ? "#3b82f6" : "#2563eb",
+    progressBg: isDark ? "#374151" : "#e5e7eb",
+    yesColor: "#10b981",
+    noColor: "#ef4444",
+  };
+
+  useEffect(() => {
+    fetchPolls();
+  }, []);
+  const fetchPolls = async () => {
+    try {
+      setLoading(true);
+
+      const response = await fetch("http://127.0.0.1:8000/api/polls/");
+
+      if (!response.ok) {
+        throw new Error("Failed to fetch polls");
+      }
+
+      const data = await response.json();
+      setPolls(
+        data.map((poll: Poll) => ({
+          id: poll.id,
+          question: poll.question,
+          description: poll.description,
+          updated_at: poll.updated_at,
+          created_at: poll.created_at,
+          is_active: poll.is_active,
+          yes_votes: poll.yes_votes,
+          no_votes: poll.no_votes,
+          total_votes: poll.total_votes,
+        }))
+      );
+    } catch (error) {
+      console.error("Error fetching polls:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchPolls();
+    setRefreshing(false);
+  };
+
+  const handlePollPress = async (poll: Poll) => {
+    try {
+      const deviceId = await getDeviceId();
+
+      const res = await fetch(`${API_URL}/polls/${poll.id}/check_vote/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_id: deviceId }),
+      });
+
+      const data = await res.json();
+
+      if (data.has_voted) {
+        Toast.show({
+          type: "info",
+          text1: "Already voted",
+          text2: "You have already voted on this poll",
+        });
+        return;
+      }
+
+      router.push(`/poll/${poll.id}`);
+    } catch (err) {
+      Toast.show({
+        type: "error",
+        text1: "Something went wrong",
+      });
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = Math.abs(now.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString();
+  };
+
+  const PollCard = ({
+    poll,
+  }: {
+    poll: Poll & {
+      yes_votes: number;
+      no_votes: number;
+      total_votes: number;
+    };
+  }) => {
+    const yesPercentage =
+      poll.total_votes > 0 ? (poll.yes_votes / poll.total_votes) * 100 : 0;
+    const noPercentage =
+      poll.total_votes > 0 ? (poll.no_votes / poll.total_votes) * 100 : 0;
+
+    return (
+      <TouchableOpacity
+        style={[styles.pollCard, { backgroundColor: colors.card }]}
+        onPress={() => handlePollPress(poll)}
+        activeOpacity={poll.is_active ? 0.7 : 1}
+        disabled={!poll.is_active}
+      >
+        <View style={styles.pollHeader}>
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                backgroundColor: poll.is_active
+                  ? `${colors.active}20`
+                  : `${colors.inactive}20`,
+              },
+            ]}
+          >
+            {poll.is_active ? (
+              <CheckCircle size={14} color={colors.active} />
+            ) : (
+              <Clock size={14} color={colors.inactive} />
+            )}
+            <Text
+              style={[
+                styles.statusText,
+                { color: poll.is_active ? colors.active : colors.inactive },
+              ]}
+            >
+              {poll.is_active ? "Active" : "Closed"}
+            </Text>
+          </View>
+          <View style={styles.dateContainer}>
+            <Clock size={12} color={colors.subtext} />
+            <Text style={[styles.dateText, { color: colors.subtext }]}>
+              {formatDate(poll.created_at)}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={[styles.question, { color: colors.text }]}>
+          {poll.question}
+        </Text>
+
+        <View style={styles.resultsContainer}>
+          <View
+            style={[styles.progressBar, { backgroundColor: colors.progressBg }]}
+          >
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${yesPercentage}%`,
+                  backgroundColor: colors.yesColor,
+                },
+              ]}
+            />
+          </View>
+
+          <View style={styles.voteStats}>
+            <View style={styles.voteStat}>
+              <View style={styles.voteLabel}>
+                <View
+                  style={[
+                    styles.colorDot,
+                    { backgroundColor: colors.yesColor },
+                  ]}
+                />
+                <Text style={[styles.voteText, { color: colors.text }]}>
+                  Yes
+                </Text>
+              </View>
+              <Text style={[styles.votePercentage, { color: colors.text }]}>
+                {yesPercentage.toFixed(1)}%
+              </Text>
+            </View>
+
+            <View style={styles.voteStat}>
+              <View style={styles.voteLabel}>
+                <View
+                  style={[styles.colorDot, { backgroundColor: colors.noColor }]}
+                />
+                <Text style={[styles.voteText, { color: colors.text }]}>
+                  No
+                </Text>
+              </View>
+              <Text style={[styles.votePercentage, { color: colors.text }]}>
+                {noPercentage.toFixed(1)}%
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={[styles.footer, { borderTopColor: colors.border }]}>
+          <View style={styles.totalVotes}>
+            <TrendingUp size={14} color={colors.primary} />
+            <Text style={[styles.totalVotesText, { color: colors.subtext }]}>
+              {poll?.total_votes?.toLocaleString()} votes
+            </Text>
+          </View>
+          {poll.is_active && (
+            <Text style={[styles.tapHint, { color: colors.primary }]}>
+              Tap to vote
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  if (loading) {
+    return (
+      <View
+        style={[
+          styles.container,
+          styles.centerContent,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        <ActivityIndicator size="large" color={colors.primary} />
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Tab One</Text>
-      <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <EditScreenInfo path="app/(tabs)/index.tsx" />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Public Polls
+        </Text>
+        <Text style={[styles.headerSubtitle, { color: colors.subtext }]}>
+          Vote on trending topics
+        </Text>
+      </View>
+
+      {polls.length === 0 ? (
+        <View
+          style={[styles.emptyState, { backgroundColor: colors.background }]}
+        >
+          <Text style={[styles.emptyText, { color: colors.text }]}>
+            No polls yet
+          </Text>
+          <Text style={[styles.emptySubtext, { color: colors.subtext }]}>
+            Create the first poll to get started!
+          </Text>
+        </View>
+      ) : (
+        <ScrollView
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
+          {polls.map((poll) => (
+            <PollCard key={poll.id} poll={poll} />
+          ))}
+        </ScrollView>
+      )}
     </View>
   );
 }
@@ -16,16 +309,144 @@ export default function TabOneScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
-  title: {
+  centerContent: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  header: {
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
+  headerTitle: {
+    fontSize: 32,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 16,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  scrollContent: {
+    padding: 20,
+    paddingTop: 0,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  emptyText: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: "600",
+    marginBottom: 8,
   },
-  separator: {
-    marginVertical: 30,
-    height: 1,
-    width: '80%',
+  emptySubtext: {
+    fontSize: 16,
+  },
+  pollCard: {
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  pollHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  dateContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  dateText: {
+    fontSize: 12,
+  },
+  question: {
+    fontSize: 18,
+    fontWeight: "600",
+    lineHeight: 26,
+    marginBottom: 16,
+  },
+  resultsContainer: {
+    marginBottom: 16,
+  },
+  progressBar: {
+    height: 8,
+    borderRadius: 4,
+    overflow: "hidden",
+    marginBottom: 12,
+  },
+  progressFill: {
+    height: "100%",
+    borderRadius: 4,
+  },
+  voteStats: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  voteStat: {
+    flex: 1,
+  },
+  voteLabel: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
+  },
+  colorDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  voteText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  votePercentage: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  footer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingTop: 12,
+    borderTopWidth: 1,
+  },
+  totalVotes: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  totalVotesText: {
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  tapHint: {
+    fontSize: 14,
+    fontWeight: "600",
   },
 });
