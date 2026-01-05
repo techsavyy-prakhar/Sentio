@@ -14,16 +14,19 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { ArrowLeft, CheckCircle, TrendingUp, Users } from "lucide-react-native";
 import { type Poll } from "@/lib/types";
 import { getDeviceId } from "../utils/deviceId";
-import { API_URL } from "@/constants/Api";
+import { API_URL } from "../../constants/api";
 
 export default function PollDetailScreen() {
-  const { id } = useLocalSearchParams();
 
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const [selectedVote, setSelectedVote] = useState<"yes" | "no" | null>(null);
-  const [hasVoted, setHasVoted] = useState(false);
+  const { id, hasVoted } = useLocalSearchParams<{
+    id: string;
+    hasVoted?: string;
+  }>();
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const yesScale = useRef(new Animated.Value(1)).current;
@@ -54,21 +57,21 @@ export default function PollDetailScreen() {
     try {
       setLoading(true);
 
-      const response = await fetch(`http://127.0.0.1:8000/api/polls/${id}/`);
+      const response = await fetch(`${API_URL}/polls/${id}/`);
+      console.log("Logg", response);
 
       if (!response.ok) {
         throw new Error("Failed to fetch poll");
       }
 
       const pollData = await response.json();
-      console.log("Logging the poll Data", pollData);
 
       setPoll({
         id: pollData.id,
         question: pollData.question,
         description: pollData.description,
-        created_at: pollData.createdAt,
-        updated_at: pollData.updatedAt,
+        created_at: pollData.created_at,
+        updated_at: pollData.updated_at,
         is_active: pollData.is_active,
         yes_votes: pollData.yes_votes,
         no_votes: pollData.no_votes,
@@ -103,7 +106,6 @@ export default function PollDetailScreen() {
   const submitVote = async () => {
     if (!selectedVote) return;
     const deviceId = await getDeviceId();
-    console.log("Logging the device Id", deviceId);
 
     try {
       setSubmitting(true);

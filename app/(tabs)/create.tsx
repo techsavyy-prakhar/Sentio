@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { Sparkles, CheckCircle, Info } from "lucide-react-native";
 import { router } from "expo-router";
+import { API_URL } from "../../constants/api";
 
 export default function CreatePollScreen() {
   const colorScheme = useColorScheme();
@@ -42,7 +43,7 @@ export default function CreatePollScreen() {
     try {
       setIsSubmitting(true);
 
-      const response = await fetch("http://127.0.0.1:8000/api/polls/", {
+      const response = await fetch(`${API_URL}/polls/`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

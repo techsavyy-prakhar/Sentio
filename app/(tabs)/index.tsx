@@ -9,8 +9,8 @@ import {
   RefreshControl,
   ActivityIndicator,
 } from "react-native";
-import Toast from 'react-native-toast-message';
-import { API_URL } from "@/constants/Api";
+import Toast from "react-native-toast-message";
+import { API_URL } from "../../constants/api";
 
 import { useFocusEffect, useRouter } from "expo-router";
 import { Clock, CheckCircle, TrendingUp } from "lucide-react-native";
@@ -26,11 +26,10 @@ export default function PollsScreen() {
   const [polls, setPolls] = useState<
     (Poll & { yes_votes: number; no_votes: number; total_votes: number })[]
   >([]);
-  
 
   useFocusEffect(
     useCallback(() => {
-      fetchPolls(); 
+      fetchPolls();
     }, [])
   );
   const colors = {
@@ -54,7 +53,7 @@ export default function PollsScreen() {
     try {
       setLoading(true);
 
-      const response = await fetch("http://127.0.0.1:8000/api/polls/");
+      const response = await fetch(`${API_URL}/polls`);
 
       if (!response.ok) {
         throw new Error("Failed to fetch polls");
@@ -90,24 +89,18 @@ export default function PollsScreen() {
     try {
       const deviceId = await getDeviceId();
 
-      const res = await fetch(`${API_URL}/polls/${poll.id}/check_vote/`, {
+      const res = await fetch(`${API_URL}/polls/${poll.id}/vote/`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_id: deviceId }),
+        body: JSON.stringify({ device_id: deviceId, vote_value: true }),
       });
 
       const data = await res.json();
 
-      if (data.has_voted) {
-        Toast.show({
-          type: "info",
-          text1: "Already voted",
-          text2: "You have already voted on this poll",
-        });
-        return;
-      }
-
-      router.push(`/poll/${poll.id}`);
+      router.push({
+        pathname: "/poll/[id]",
+        params: { id: poll.id, hasVoted: data.has_voted },
+      });
     } catch (err) {
       Toast.show({
         type: "error",
@@ -190,15 +183,29 @@ export default function PollsScreen() {
           <View
             style={[styles.progressBar, { backgroundColor: colors.progressBg }]}
           >
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  width: `${yesPercentage}%`,
-                  backgroundColor: colors.yesColor,
-                },
-              ]}
-            />
+            <View style={styles.progressContainer}>
+              {/* YES */}
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${yesPercentage}%`,
+                    backgroundColor: colors.yesColor,
+                  },
+                ]}
+              />
+
+              {/* NO */}
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${noPercentage}%`,
+                    backgroundColor: colors.noColor,
+                  },
+                ]}
+              />
+            </View>
           </View>
 
           <View style={styles.voteStats}>
@@ -392,6 +399,14 @@ const styles = StyleSheet.create({
   },
   resultsContainer: {
     marginBottom: 16,
+  },
+  progressContainer: {
+    width: "100%",
+    height: 10,
+    backgroundColor: "#e0e0e0",
+    borderRadius: 6,
+    overflow: "hidden",
+    flexDirection: "row", // 👈 IMPORTANT
   },
   progressBar: {
     height: 8,
