@@ -10,12 +10,12 @@ import {
   ActivityIndicator,
 } from "react-native";
 import Toast from "react-native-toast-message";
-import { API_URL } from "../../constants/api";
+import { apiEndpoint } from "@/lib/config/api";
 
 import { useFocusEffect, useRouter } from "expo-router";
 import { Clock, CheckCircle, TrendingUp } from "lucide-react-native";
 import { type Poll } from "@/lib/types";
-import { getDeviceId } from "../utils/deviceId";
+import { getDeviceId } from "../../lib/utils/deviceId";
 
 export default function PollsScreen() {
   const colorScheme = useColorScheme();
@@ -52,27 +52,25 @@ export default function PollsScreen() {
   const fetchPolls = async () => {
     try {
       setLoading(true);
-
-      const response = await fetch(`${API_URL}/polls`);
-
+  
+      const response = await fetch(
+        apiEndpoint("/polls/"), // ✅ GET by default
+        {
+          method: "GET", 
+          headers: {
+            "Accept": "application/json",
+          },
+        }
+      );
+  
       if (!response.ok) {
+        const errorText = await response.text();
+        console.error("Backend error:", errorText);
         throw new Error("Failed to fetch polls");
       }
-
+  
       const data = await response.json();
-      setPolls(
-        data.map((poll: Poll) => ({
-          id: poll.id,
-          question: poll.question,
-          description: poll.description,
-          updated_at: poll.updated_at,
-          created_at: poll.created_at,
-          is_active: poll.is_active,
-          yes_votes: poll.yes_votes,
-          no_votes: poll.no_votes,
-          total_votes: poll.total_votes,
-        }))
-      );
+      setPolls(data);
     } catch (error) {
       console.error("Error fetching polls:", error);
     } finally {
@@ -89,17 +87,22 @@ export default function PollsScreen() {
     try {
       const deviceId = await getDeviceId();
 
-      const res = await fetch(`${API_URL}/polls/${poll.id}/vote/`, {
+      const res = await fetch(apiEndpoint(`/polls/${poll.id}/vote/`), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_id: deviceId, vote_value: true }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          device_id: deviceId,
+          vote_value: true,
+        }),
       });
 
       const data = await res.json();
 
       router.push({
         pathname: "/poll/[id]",
-        params: { id: poll.id, hasVoted: data.has_voted },
+        params: { id: poll.id, hasVoted: data.has_voted == undefined ? "false" : "true" },
       });
     } catch (err) {
       Toast.show({

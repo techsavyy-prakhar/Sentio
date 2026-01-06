@@ -13,11 +13,10 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { ArrowLeft, CheckCircle, TrendingUp, Users } from "lucide-react-native";
 import { type Poll } from "@/lib/types";
-import { getDeviceId } from "../utils/deviceId";
-import { API_URL } from "../../constants/api";
+import { getDeviceId } from "../../lib/utils/deviceId";
+import { apiEndpoint } from "@/lib/config/api";
 
 export default function PollDetailScreen() {
-
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -57,8 +56,7 @@ export default function PollDetailScreen() {
     try {
       setLoading(true);
 
-      const response = await fetch(`${API_URL}/polls/${id}/`);
-      console.log("Logg", response);
+      const response = await fetch(apiEndpoint(`/polls/${id}/`));
 
       if (!response.ok) {
         throw new Error("Failed to fetch poll");
@@ -105,19 +103,27 @@ export default function PollDetailScreen() {
 
   const submitVote = async () => {
     if (!selectedVote) return;
+
     const deviceId = await getDeviceId();
 
     try {
       setSubmitting(true);
 
-      await fetch(`${API_URL}/polls/${id}/vote/`, {
+      const response = await fetch(apiEndpoint(`/polls/${id}/vote/`), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           vote_value: selectedVote === "yes",
           device_id: deviceId,
         }),
       });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error?.detail || "Voting failed");
+      }
 
       router.replace("/");
     } catch (err) {

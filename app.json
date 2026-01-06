@@ -1,40 +1,49 @@
 {
   "expo": {
-    "name": "poll-app",
-    "slug": "poll-app",
+    "name": "Sentio",
+    "slug": "sentio",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "pollapp",
     "userInterfaceStyle": "automatic",
+
+    "icon": "./assets/images/icon.png",
+
+    "scheme": "sentio",
     "newArchEnabled": true,
+
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.prakhar-aggarwal.pollapp"
+      "bundleIdentifier": "com.prakharaggarwal.sentio",
+      "icon": "./assets/images/icon.png"
     },
+
     "android": {
+      "package": "com.prakharaggarwal.sentio",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "usesCleartextTraffic": true,
-      "package": "com.prakhar_aggarwal.pollapp"
+      "usesCleartextTraffic": true
     },
+
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
+
     "plugins": [
       "expo-router"
     ],
+
     "experiments": {
       "typedRoutes": true
     }
