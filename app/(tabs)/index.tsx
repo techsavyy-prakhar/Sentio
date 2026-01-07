@@ -16,6 +16,7 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Clock, CheckCircle, TrendingUp } from "lucide-react-native";
 import { type Poll } from "@/lib/types";
 import { getDeviceId } from "../../lib/utils/deviceId";
+import { TextInput } from "react-native";
 
 export default function PollsScreen() {
   const colorScheme = useColorScheme();
@@ -26,12 +27,26 @@ export default function PollsScreen() {
   const [polls, setPolls] = useState<
     (Poll & { yes_votes: number; no_votes: number; total_votes: number })[]
   >([]);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useFocusEffect(
     useCallback(() => {
       fetchPolls();
     }, [])
   );
+  const filteredPolls = polls.filter((poll) => {
+    if (!searchQuery.trim()) return true;
+
+    const queryWords = searchQuery.toLowerCase().split(/\s+/);
+
+    const searchableText = (
+      poll.question +
+      " " +
+      (poll.description ?? "")
+    ).toLowerCase();
+
+    return queryWords.some((word) => searchableText.includes(word));
+  });
   const colors = {
     background: isDark ? "#0a0a0a" : "#f5f7fa",
     card: isDark ? "#1a1a1a" : "#ffffff",
@@ -52,23 +67,23 @@ export default function PollsScreen() {
   const fetchPolls = async () => {
     try {
       setLoading(true);
-  
+
       const response = await fetch(
         apiEndpoint("/polls/"), // ✅ GET by default
         {
-          method: "GET", 
+          method: "GET",
           headers: {
-            "Accept": "application/json",
+            Accept: "application/json",
           },
         }
       );
-  
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error("Backend error:", errorText);
         throw new Error("Failed to fetch polls");
       }
-  
+
       const data = await response.json();
       setPolls(data);
     } catch (error) {
@@ -94,15 +109,18 @@ export default function PollsScreen() {
         },
         body: JSON.stringify({
           device_id: deviceId,
-          vote_value: true,
         }),
       });
 
       const data = await res.json();
+      console.log("Logging the data", data);
 
       router.push({
         pathname: "/poll/[id]",
-        params: { id: poll.id, hasVoted: data.has_voted == undefined ? "false" : "true" },
+        params: {
+          id: poll.id,
+          hasVoted: data.has_voted == undefined ? "false" : data.has_voted,
+        },
       });
     } catch (err) {
       Toast.show({
@@ -286,8 +304,31 @@ export default function PollsScreen() {
           Vote on trending topics
         </Text>
       </View>
+      <View
+        style={[
+          styles.searchContainer,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <TextInput
+          placeholder="Search polls..."
+          placeholderTextColor={colors.subtext}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          style={[
+            styles.searchInput,
+            {
+              color: colors.text,
+            },
+          ]}
+          clearButtonMode="while-editing"
+        />
+      </View>
 
-      {polls.length === 0 ? (
+      {filteredPolls.length === 0 ? (
         <View
           style={[styles.emptyState, { backgroundColor: colors.background }]}
         >
@@ -307,7 +348,7 @@ export default function PollsScreen() {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {polls.map((poll) => (
+          {filteredPolls.map((poll) => (
             <PollCard key={poll.id} poll={poll} />
           ))}
         </ScrollView>
@@ -466,5 +507,17 @@ const styles = StyleSheet.create({
   tapHint: {
     fontSize: 14,
     fontWeight: "600",
+  },
+  searchContainer: {
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+
+  searchInput: {
+    fontSize: 16,
   },
 });

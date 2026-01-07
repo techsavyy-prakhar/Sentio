@@ -225,7 +225,7 @@ export default function PollDetailScreen() {
           </View>
         </View>
 
-        {!hasVoted && poll.is_active ? (
+        {hasVoted == "false" && poll.is_active ? (
           <View style={styles.votingSection}>
             <Text style={[styles.sectionTitle, { color: colors.text }]}>
               Cast Your Vote
@@ -315,7 +315,7 @@ export default function PollDetailScreen() {
         ) : null}
 
         <View style={[styles.resultsCard, { backgroundColor: colors.card }]}>
-          {hasVoted && (
+          {hasVoted == "true" && (
             <>
               <View style={styles.successBadge}>
                 <CheckCircle size={48} color={colors.yesColor} />

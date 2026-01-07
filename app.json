@@ -5,24 +5,22 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
-
     "icon": "./assets/images/sentio_icon.png",
-
     "scheme": "sentio",
     "newArchEnabled": true,
-
     "splash": {
       "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
+      "resizeMode": "cover",
       "backgroundColor": "#2e3c3c"
     },
-
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.prakharaggarwal.sentio",
-      "icon": "./assets/images/sentio_icon.png"
+      "icon": "./assets/images/sentio_icon.png",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
-
     "android": {
       "package": "com.prakharaggarwal.sentio",
       "adaptiveIcon": {
@@ -33,19 +31,22 @@
       "predictiveBackGestureEnabled": false,
       "usesCleartextTraffic": true
     },
-
     "web": {
       "bundler": "metro",
       "output": "static",
       "favicon": "./assets/images/favicon.png"
     },
-
     "plugins": [
       "expo-router"
     ],
-
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "cb360979-db24-4ae4-a548-6aa65735dbb2"
+      }
     }
   }
 }
