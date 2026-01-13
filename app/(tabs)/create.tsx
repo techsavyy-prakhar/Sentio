@@ -15,6 +15,7 @@ import {
 import { Sparkles, CheckCircle, Info } from "lucide-react-native";
 import { router } from "expo-router";
 import { apiEndpoint } from "@/lib/config/api";
+import Toast from "react-native-toast-message";
 
 export default function CreatePollScreen() {
   const colorScheme = useColorScheme();
@@ -56,12 +57,36 @@ export default function CreatePollScreen() {
           }),
         }
       );
-
-      if (!response.ok) {
-        throw new Error("Failed to create poll");
+      const text = await response.text();
+    
+      let data;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        Toast.show({
+          type: "error",
+          text1: "Server error",
+          text2: "Invalid server response",
+        });
+        return;
       }
-
-      const data = await response.json();
+      if (!response.ok) {
+        Toast.show({
+          type: "error",
+          text1: "Poll rejected",
+          text2:
+            data?.error ||
+            "Your poll violates our content guidelines.",
+        });
+        return;
+      }
+      Toast.show({
+        type: "success",
+        text1: "Poll created",
+        text2: "Your poll is now live",
+      });
+      setQuestion("");
+      setDescription("");
       setShowSuccess(true);
       setShowSuccess(false);
       setQuestion("");

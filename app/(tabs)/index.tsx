@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -17,6 +17,9 @@ import { Clock, CheckCircle, TrendingUp } from "lucide-react-native";
 import { type Poll } from "@/lib/types";
 import { getDeviceId } from "../../lib/utils/deviceId";
 import { TextInput } from "react-native";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+import { Alert } from "react-native";
+import { ThumbsUp, Flag } from "lucide-react-native";
 
 export default function PollsScreen() {
   const colorScheme = useColorScheme();
@@ -47,6 +50,16 @@ export default function PollsScreen() {
 
     return queryWords.some((word) => searchableText.includes(word));
   });
+
+  const renderRightActions = (pollId: string) => (
+    <TouchableOpacity
+      onPress={() => handleReport(pollId)}
+      style={styles.rightAction}
+    >
+      <Flag size={20} color="#fff" />
+      <Text style={styles.actionText}>Report</Text>
+    </TouchableOpacity>
+  );
   const colors = {
     background: isDark ? "#0a0a0a" : "#f5f7fa",
     card: isDark ? "#1a1a1a" : "#ffffff",
@@ -130,6 +143,48 @@ export default function PollsScreen() {
     }
   };
 
+  const handleReport = (pollId: string) => {
+    Alert.alert("Report Poll", "Why are you reporting this poll?", [
+      {
+        text: "Inappropriate content",
+        onPress: async () => {
+          try {
+            const response = await fetch(
+              apiEndpoint(`/polls/${pollId}/report/`),
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  device_id: await getDeviceId(),
+                  reason: "inappropriate_content",
+                }),
+              }
+            );
+            if (response.status === 409) {
+              Toast.show({
+                type: "error",
+                text1: "You already reported this poll",
+              });
+            } else {
+              Toast.show({
+                type: "success",
+                text1: "Poll reported",
+              });
+            }
+          } catch (err) {
+            Toast.show({
+              type: "error",
+              text1: "Failed to report poll",
+            });
+          }
+        },
+      },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -157,126 +212,134 @@ export default function PollsScreen() {
       poll.total_votes > 0 ? (poll.no_votes / poll.total_votes) * 100 : 0;
 
     return (
-      <TouchableOpacity
-        style={[styles.pollCard, { backgroundColor: colors.card }]}
-        onPress={() => handlePollPress(poll)}
-        activeOpacity={poll.is_active ? 0.7 : 1}
-        disabled={!poll.is_active}
-      >
-        <View style={styles.pollHeader}>
-          <View
-            style={[
-              styles.statusBadge,
-              {
-                backgroundColor: poll.is_active
-                  ? `${colors.active}20`
-                  : `${colors.inactive}20`,
-              },
-            ]}
-          >
-            {poll.is_active ? (
-              <CheckCircle size={14} color={colors.active} />
-            ) : (
-              <Clock size={14} color={colors.inactive} />
-            )}
-            <Text
+      <Swipeable renderRightActions={() => renderRightActions(poll.id)}>
+        <TouchableOpacity
+          style={[styles.pollCard, { backgroundColor: colors.card }]}
+          onPress={() => handlePollPress(poll)}
+          activeOpacity={poll.is_active ? 0.7 : 1}
+          disabled={!poll.is_active}
+        >
+          <View style={styles.pollHeader}>
+            <View
               style={[
-                styles.statusText,
-                { color: poll.is_active ? colors.active : colors.inactive },
+                styles.statusBadge,
+                {
+                  backgroundColor: poll.is_active
+                    ? `${colors.active}20`
+                    : `${colors.inactive}20`,
+                },
               ]}
             >
-              {poll.is_active ? "Active" : "Closed"}
-            </Text>
-          </View>
-          <View style={styles.dateContainer}>
-            <Clock size={12} color={colors.subtext} />
-            <Text style={[styles.dateText, { color: colors.subtext }]}>
-              {formatDate(poll.created_at)}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={[styles.question, { color: colors.text }]}>
-          {poll.question}
-        </Text>
-
-        <View style={styles.resultsContainer}>
-          <View
-            style={[styles.progressBar, { backgroundColor: colors.progressBg }]}
-          >
-            <View style={styles.progressContainer}>
-              {/* YES */}
-              <View
+              {poll.is_active ? (
+                <CheckCircle size={14} color={colors.active} />
+              ) : (
+                <Clock size={14} color={colors.inactive} />
+              )}
+              <Text
                 style={[
-                  styles.progressFill,
-                  {
-                    width: `${yesPercentage}%`,
-                    backgroundColor: colors.yesColor,
-                  },
+                  styles.statusText,
+                  { color: poll.is_active ? colors.active : colors.inactive },
                 ]}
-              />
-
-              {/* NO */}
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${noPercentage}%`,
-                    backgroundColor: colors.noColor,
-                  },
-                ]}
-              />
+              >
+                {poll.is_active ? "Active" : "Closed"}
+              </Text>
+            </View>
+            <View style={styles.dateContainer}>
+              <Clock size={12} color={colors.subtext} />
+              <Text style={[styles.dateText, { color: colors.subtext }]}>
+                {formatDate(poll.created_at)}
+              </Text>
             </View>
           </View>
 
-          <View style={styles.voteStats}>
-            <View style={styles.voteStat}>
-              <View style={styles.voteLabel}>
+          <Text style={[styles.question, { color: colors.text }]}>
+            {poll.question}
+          </Text>
+
+          <View style={styles.resultsContainer}>
+            <View
+              style={[
+                styles.progressBar,
+                { backgroundColor: colors.progressBg },
+              ]}
+            >
+              <View style={styles.progressContainer}>
+                {/* YES */}
                 <View
                   style={[
-                    styles.colorDot,
-                    { backgroundColor: colors.yesColor },
+                    styles.progressFill,
+                    {
+                      width: `${yesPercentage}%`,
+                      backgroundColor: colors.yesColor,
+                    },
                   ]}
                 />
-                <Text style={[styles.voteText, { color: colors.text }]}>
-                  Yes
-                </Text>
-              </View>
-              <Text style={[styles.votePercentage, { color: colors.text }]}>
-                {yesPercentage.toFixed(1)}%
-              </Text>
-            </View>
 
-            <View style={styles.voteStat}>
-              <View style={styles.voteLabel}>
+                {/* NO */}
                 <View
-                  style={[styles.colorDot, { backgroundColor: colors.noColor }]}
+                  style={[
+                    styles.progressFill,
+                    {
+                      width: `${noPercentage}%`,
+                      backgroundColor: colors.noColor,
+                    },
+                  ]}
                 />
-                <Text style={[styles.voteText, { color: colors.text }]}>
-                  No
+              </View>
+            </View>
+
+            <View style={styles.voteStats}>
+              <View style={styles.voteStat}>
+                <View style={styles.voteLabel}>
+                  <View
+                    style={[
+                      styles.colorDot,
+                      { backgroundColor: colors.yesColor },
+                    ]}
+                  />
+                  <Text style={[styles.voteText, { color: colors.text }]}>
+                    Yes
+                  </Text>
+                </View>
+                <Text style={[styles.votePercentage, { color: colors.text }]}>
+                  {yesPercentage.toFixed(1)}%
                 </Text>
               </View>
-              <Text style={[styles.votePercentage, { color: colors.text }]}>
-                {noPercentage.toFixed(1)}%
-              </Text>
+
+              <View style={styles.voteStat}>
+                <View style={styles.voteLabel}>
+                  <View
+                    style={[
+                      styles.colorDot,
+                      { backgroundColor: colors.noColor },
+                    ]}
+                  />
+                  <Text style={[styles.voteText, { color: colors.text }]}>
+                    No
+                  </Text>
+                </View>
+                <Text style={[styles.votePercentage, { color: colors.text }]}>
+                  {noPercentage.toFixed(1)}%
+                </Text>
+              </View>
             </View>
           </View>
-        </View>
 
-        <View style={[styles.footer, { borderTopColor: colors.border }]}>
-          <View style={styles.totalVotes}>
-            <TrendingUp size={14} color={colors.primary} />
-            <Text style={[styles.totalVotesText, { color: colors.subtext }]}>
-              {poll?.total_votes?.toLocaleString()} votes
-            </Text>
+          <View style={[styles.footer, { borderTopColor: colors.border }]}>
+            <View style={styles.totalVotes}>
+              <TrendingUp size={14} color={colors.primary} />
+              <Text style={[styles.totalVotesText, { color: colors.subtext }]}>
+                {poll?.total_votes?.toLocaleString()} votes
+              </Text>
+            </View>
+            {poll.is_active && (
+              <Text style={[styles.tapHint, { color: colors.primary }]}>
+                Tap to vote
+              </Text>
+            )}
           </View>
-          {poll.is_active && (
-            <Text style={[styles.tapHint, { color: colors.primary }]}>
-              Tap to vote
-            </Text>
-          )}
-        </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </Swipeable>
     );
   };
 
@@ -426,6 +489,23 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 12,
     fontWeight: "600",
+  },
+  rightAction: {
+    backgroundColor: "#ef4444",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    height: "50%",
+    width: 100,
+    borderRadius: 40,
+    alignSelf: "center",
+    marginLeft: 10,
+  },
+
+  actionText: {
+    color: "#fff",
+    fontWeight: "600",
+    marginTop: 4,
   },
   dateContainer: {
     flexDirection: "row",
