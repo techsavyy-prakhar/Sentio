@@ -15,6 +15,7 @@ import { ArrowLeft, CheckCircle, TrendingUp, Users } from "lucide-react-native";
 import { type Poll } from "@/lib/types";
 import { getDeviceId } from "../../lib/utils/deviceId";
 import { apiEndpoint } from "@/lib/config/api";
+import LoadPollSkeleton from "../../components/LoadPollSkeleton";
 
 export default function PollDetailScreen() {
   const router = useRouter();
@@ -49,7 +50,6 @@ export default function PollDetailScreen() {
 
   useEffect(() => {
     fetchPoll();
-    setLoading(false);
   }, [id]);
 
   const fetchPoll = async () => {
@@ -77,6 +77,7 @@ export default function PollDetailScreen() {
       });
     } catch (error) {
       console.error("Error fetching poll:", error);
+      setPoll(null);
     } finally {
       setLoading(false);
     }
@@ -134,17 +135,7 @@ export default function PollDetailScreen() {
   };
 
   if (loading) {
-    return (
-      <View
-        style={[
-          styles.container,
-          styles.centerContent,
-          { backgroundColor: colors.background },
-        ]}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
+    return <LoadPollSkeleton colors={colors} />;
   }
 
   if (!poll) {
@@ -156,7 +147,7 @@ export default function PollDetailScreen() {
           { backgroundColor: colors.background },
         ]}
       >
-        <Text style={{ color: colors.text }}>Poll not found</Text>
+        <Text style={{ color: colors.text }}>Failed to load poll</Text>
       </View>
     );
   }

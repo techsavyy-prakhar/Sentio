@@ -13,13 +13,15 @@ import Toast from "react-native-toast-message";
 import { apiEndpoint } from "@/lib/config/api";
 
 import { useFocusEffect, useRouter } from "expo-router";
-import { Clock, CheckCircle, TrendingUp } from "lucide-react-native";
+import { Clock, CheckCircle, TrendingUp, Contact } from "lucide-react-native";
 import { type Poll } from "@/lib/types";
 import { getDeviceId } from "../../lib/utils/deviceId";
 import { TextInput } from "react-native";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { Alert } from "react-native";
-import { ThumbsUp, Flag } from "lucide-react-native";
+import { Eye, Flag } from "lucide-react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { contactUs } from "@/lib/utils/contactUs";
 
 export default function PollsScreen() {
   const colorScheme = useColorScheme();
@@ -31,6 +33,7 @@ export default function PollsScreen() {
     (Poll & { yes_votes: number; no_votes: number; total_votes: number })[]
   >([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [hiddenPolls, setHiddenPolls] = useState<string[]>([]);
 
   useFocusEffect(
     useCallback(() => {
@@ -52,14 +55,33 @@ export default function PollsScreen() {
   });
 
   const renderRightActions = (pollId: string) => (
-    <TouchableOpacity
-      onPress={() => handleReport(pollId)}
-      style={styles.rightAction}
+    <View
+      style={{
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 10,
+        justifyContent: "center",
+        height: "100%",
+      }}
     >
-      <Flag size={20} color="#fff" />
-      <Text style={styles.actionText}>Report</Text>
-    </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => handlePollHide(pollId)}
+        style={styles.rightActionHide}
+      >
+        <Eye size={20} color="#fff" />
+        <Text style={styles.actionText}>Hide</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => handleReport(pollId)}
+        style={styles.rightActionReport}
+      >
+        <Flag size={20} color="#fff" />
+        <Text style={styles.actionText}>Report</Text>
+      </TouchableOpacity>
+    </View>
   );
+
   const colors = {
     background: isDark ? "#0a0a0a" : "#f5f7fa",
     card: isDark ? "#1a1a1a" : "#ffffff",
@@ -77,19 +99,22 @@ export default function PollsScreen() {
   useEffect(() => {
     fetchPolls();
   }, []);
+  const getHiddenPolls = async (): Promise<string[]> => {
+    try {
+      const stored = await AsyncStorage.getItem("hiddenPolls");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  };
   const fetchPolls = async () => {
     try {
       setLoading(true);
 
-      const response = await fetch(
-        apiEndpoint("/polls/"), // ✅ GET by default
-        {
-          method: "GET",
-          headers: {
-            Accept: "application/json",
-          },
-        }
-      );
+      const response = await fetch(apiEndpoint("/polls/"), {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -98,13 +123,22 @@ export default function PollsScreen() {
       }
 
       const data = await response.json();
-      setPolls(data);
+
+      // ✅ FILTER HIDDEN POLLS
+      const hiddenPolls = await getHiddenPolls();
+
+      const visiblePolls = data.filter(
+        (poll: Poll) => !hiddenPolls.includes(poll.id)
+      );
+
+      setPolls(visiblePolls);
     } catch (error) {
       console.error("Error fetching polls:", error);
     } finally {
       setLoading(false);
     }
   };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await fetchPolls();
@@ -126,8 +160,6 @@ export default function PollsScreen() {
       });
 
       const data = await res.json();
-      console.log("Logging the data", data);
-
       router.push({
         pathname: "/poll/[id]",
         params: {
@@ -356,16 +388,45 @@ export default function PollsScreen() {
       </View>
     );
   }
+  const handlePollHide = async (pollId: string) => {
+    setPolls((prev) => prev.filter((poll) => poll.id !== pollId));
+
+    const stored = await AsyncStorage.getItem("hiddenPolls");
+    const hidden = stored ? JSON.parse(stored) : [];
+
+    if (!hidden.includes(pollId)) {
+      const updated = [...hidden, pollId];
+      await AsyncStorage.setItem("hiddenPolls", JSON.stringify(updated));
+      setHiddenPolls(updated);
+    }
+  };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={styles.header}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          Public Polls
-        </Text>
-        <Text style={[styles.headerSubtitle, { color: colors.subtext }]}>
-          Vote on trending topics
-        </Text>
+      <View style={[{ flexDirection: "row", justifyContent: "space-between" }]}>
+        <View style={styles.header}>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>
+            Public Polls
+          </Text>
+          <Text style={[styles.headerSubtitle, { color: colors.subtext }]}>
+            Vote on trending topics
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.contactUsHeader}
+          onPress={async () => {
+            contactUs(await getDeviceId());
+          }}
+        >
+          <Contact
+            size={18}
+            color={colors.primary}
+            style={{ marginRight: 6 }}
+          />
+          <Text style={[styles.tapHint, { color: colors.primary }]}>
+            Contact Us
+          </Text>
+        </TouchableOpacity>
       </View>
       <View
         style={[
@@ -433,6 +494,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
   },
+  contactUsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingTop: 60,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+  },
   headerTitle: {
     fontSize: 32,
     fontWeight: "700",
@@ -490,14 +559,25 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "600",
   },
-  rightAction: {
+  rightActionReport: {
     backgroundColor: "#ef4444",
     justifyContent: "center",
     alignItems: "center",
+    paddingHorizontal: 10,
+    height: "35%",
+    width: 75,
+    borderRadius: 30,
+    alignSelf: "center",
+    marginLeft: 10,
+  },
+  rightActionHide: {
+    backgroundColor: "#6b7280",
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 20,
-    height: "50%",
-    width: 100,
-    borderRadius: 40,
+    height: "35%",
+    width: 75,
+    borderRadius: 30,
     alignSelf: "center",
     marginLeft: 10,
   },

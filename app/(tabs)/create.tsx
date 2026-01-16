@@ -11,11 +11,14 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { Sparkles, CheckCircle, Info } from "lucide-react-native";
 import { router } from "expo-router";
 import { apiEndpoint } from "@/lib/config/api";
 import Toast from "react-native-toast-message";
+import { getDeviceId } from "../../lib/utils/deviceId";
+import { contactUs } from "@/lib/utils/contactUs";
 
 export default function CreatePollScreen() {
   const colorScheme = useColorScheme();
@@ -24,6 +27,7 @@ export default function CreatePollScreen() {
   const [description, setDescription] = useState("");
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [blockedModal, setBlockedModal] = useState(false);
 
   const colors = {
     background: isDark ? "#0a0a0a" : "#f5f7fa",
@@ -44,22 +48,21 @@ export default function CreatePollScreen() {
     try {
       setIsSubmitting(true);
 
-      const response = await fetch(
-        apiEndpoint("/polls/"),
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            question: question.trim(),
-            description: description?.trim() || "",
-          }),
-        }
-      );
+      const response = await fetch(apiEndpoint("/polls/"), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          question: question.trim(),
+          description: description?.trim() || "",
+          device_id: await getDeviceId(),
+        }),
+      });
+
       const text = await response.text();
-    
-      let data;
+
+      let data: any = null;
       try {
         data = JSON.parse(text);
       } catch {
@@ -70,30 +73,40 @@ export default function CreatePollScreen() {
         });
         return;
       }
+
+      // 🚫 BLOCKED DEVICE (403)
+      if (response.status === 403) {
+        setBlockedModal(true);
+        return;
+      }
+
+      // ❌ OTHER ERRORS (400, 409, etc.)
       if (!response.ok) {
         Toast.show({
           type: "error",
           text1: "Poll rejected",
-          text2:
-            data?.error ||
-            "Your poll violates our content guidelines.",
+          text2: data?.error || "Your poll violates our community guidelines.",
         });
         return;
       }
+
+      // ✅ SUCCESS
       Toast.show({
         type: "success",
         text1: "Poll created",
         text2: "Your poll is now live",
       });
-      setQuestion("");
-      setDescription("");
-      setShowSuccess(true);
-      setShowSuccess(false);
+
       setQuestion("");
       setDescription("");
       router.replace("/");
     } catch (error) {
       console.error("Error creating poll:", error);
+      Toast.show({
+        type: "error",
+        text1: "Network error",
+        text2: "Please try again later",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -120,6 +133,41 @@ export default function CreatePollScreen() {
           </Text>
         </View>
       </View>
+    );
+  }
+  if (blockedModal) {
+    return (
+      <Modal visible={blockedModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Content Creation Blocked</Text>
+
+            <Text style={styles.modalText}>
+              Your device has been temporarily blocked due to multiple reports.
+              You can still vote on polls.
+            </Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalPrimary}
+                onPress={() => {
+                  setBlockedModal(false);
+                  router.replace("/");
+                }}
+              >
+                <Text style={styles.modalPrimaryText}>Go to Polls</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalSecondary}
+                onPress={async () => contactUs(await getDeviceId())}
+              >
+                <Text style={styles.modalSecondaryText}>Contact Us</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     );
   }
 
@@ -451,5 +499,60 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 16,
     lineHeight: 18,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  modalCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 24,
+    width: "85%",
+  },
+
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    marginBottom: 12,
+    alignSelf: "center",
+  },
+
+  modalText: {
+    fontSize: 16,
+    color: "#6b7280",
+    marginBottom: 24,
+  },
+
+  modalActions: {
+    gap: 12,
+  },
+
+  modalPrimary: {
+    backgroundColor: "#2563eb",
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+
+  modalPrimaryText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+
+  modalSecondary: {
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: "center",
+  },
+
+  modalSecondaryText: {
+    color: "#2563eb",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });
