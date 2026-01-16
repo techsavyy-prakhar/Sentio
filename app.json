@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sentio",
     "slug": "sentio",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/images/sentio_icon.png",
