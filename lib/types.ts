@@ -10,6 +10,7 @@ export type Poll = {
   yes_votes?: number;
   no_votes?: number;
   total_votes?: number;
+  creator_device_id?: string;
 };
 
 export type Vote = {

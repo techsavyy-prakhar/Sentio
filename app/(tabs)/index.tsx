@@ -19,7 +19,7 @@ import { getDeviceId } from "../../lib/utils/deviceId";
 import { TextInput } from "react-native";
 import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
 import { Alert } from "react-native";
-import { Eye, Flag } from "lucide-react-native";
+import { Eye, Flag, X } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { contactUs } from "@/lib/utils/contactUs";
 
@@ -34,6 +34,17 @@ export default function PollsScreen() {
   >([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [hiddenPolls, setHiddenPolls] = useState<string[]>([]);
+  const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
+  useEffect(() => {
+    const loadBlockedUsers = async () => {
+      const stored = await AsyncStorage.getItem("blockedUsers");
+      if (stored) {
+        setBlockedUsers(JSON.parse(stored));
+      }
+    };
+
+    loadBlockedUsers();
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -54,30 +65,91 @@ export default function PollsScreen() {
     return queryWords.some((word) => searchableText.includes(word));
   });
 
-  const renderRightActions = (pollId: string) => (
+  const handleBlockUser = async (creatorDeviceId: string) => {
+    Alert.alert(
+      "Block this user?",
+      "You will no longer see any polls from this user. All their existing polls will be removed from your feed.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Block User",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const stored = await AsyncStorage.getItem("blockedUsers");
+              const blocked = stored ? JSON.parse(stored) : [];
+
+              if (!blocked.includes(creatorDeviceId)) {
+                const updated = [...blocked, creatorDeviceId];
+                await AsyncStorage.setItem(
+                  "blockedUsers",
+                  JSON.stringify(updated)
+                );
+                setBlockedUsers(updated);
+              }
+
+              Toast.show({
+                type: "success",
+                text1: "User blocked",
+                text2: "You will no longer see polls from this user",
+              });
+              fetchPolls();
+            } catch (error) {
+              console.error("Error blocking user:", error);
+              Toast.show({
+                type: "error",
+                text1: "Something went wrong",
+              });
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const renderRightActions = (pollId: string, creatorDeviceId: string) => (
     <View
       style={{
         flexDirection: "column",
         alignItems: "center",
-        gap: 10,
+        gap: 6,
         justifyContent: "center",
-        height: "100%",
+        height: "95%",
       }}
     >
       <TouchableOpacity
         onPress={() => handlePollHide(pollId)}
         style={styles.rightActionHide}
       >
-        <Eye size={20} color="#fff" />
-        <Text style={styles.actionText}>Hide</Text>
+        <Eye size={18} color="#fff" />
+        <Text
+          style={[styles.actionText, { fontSize: 10, textAlign: "center" }]}
+        >
+          Remove from feed
+        </Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         onPress={() => handleReport(pollId)}
         style={styles.rightActionReport}
       >
-        <Flag size={20} color="#fff" />
+        <Flag size={18} color="#fff" />
         <Text style={styles.actionText}>Report</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        onPress={() => handleBlockUser(creatorDeviceId)}
+        style={[styles.rightActionHide, { backgroundColor: "#F59E0B" }]}
+      >
+        <X size={18} color="#fff" />
+        <Text
+          style={[styles.actionText, { fontSize: 10, textAlign: "center" }]}
+        >
+          Block User
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -108,35 +180,25 @@ export default function PollsScreen() {
     }
   };
   const fetchPolls = async () => {
-    try {
-      setLoading(true);
+    setLoading(true);
 
-      const response = await fetch(apiEndpoint("/polls/"), {
-        method: "GET",
-        headers: { Accept: "application/json" },
-      });
+    const response = await fetch(apiEndpoint("/polls/"));
+    const data = await response.json();
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Backend error:", errorText);
-        throw new Error("Failed to fetch polls");
-      }
+    const storedBlocked = await AsyncStorage.getItem("blockedUsers");
+    const blockedUsers = storedBlocked ? JSON.parse(storedBlocked) : [];
 
-      const data = await response.json();
+    const storedHidden = await AsyncStorage.getItem("hiddenPolls");
+    const hiddenPolls = storedHidden ? JSON.parse(storedHidden) : [];
 
-      // ✅ FILTER HIDDEN POLLS
-      const hiddenPolls = await getHiddenPolls();
+    const filtered = data.filter(
+      (poll: Poll) =>
+        !blockedUsers.includes(poll.creator_device_id) &&
+        !hiddenPolls.includes(poll.id)
+    );
 
-      const visiblePolls = data.filter(
-        (poll: Poll) => !hiddenPolls.includes(poll.id)
-      );
-
-      setPolls(visiblePolls);
-    } catch (error) {
-      console.error("Error fetching polls:", error);
-    } finally {
-      setLoading(false);
-    }
+    setPolls(filtered);
+    setLoading(false);
   };
 
   const onRefresh = async () => {
@@ -244,7 +306,11 @@ export default function PollsScreen() {
       poll.total_votes > 0 ? (poll.no_votes / poll.total_votes) * 100 : 0;
 
     return (
-      <Swipeable renderRightActions={() => renderRightActions(poll.id)}>
+      <Swipeable
+        renderRightActions={() =>
+          renderRightActions(poll.id, poll.creator_device_id!)
+        }
+      >
         <TouchableOpacity
           style={[styles.pollCard, { backgroundColor: colors.card }]}
           onPress={() => handlePollPress(poll)}
@@ -564,7 +630,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 10,
-    height: "35%",
+    height: "25%",
     width: 75,
     borderRadius: 30,
     alignSelf: "center",
@@ -575,8 +641,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 20,
-    height: "35%",
-    width: 75,
+    height: "30%",
+    width: 80,
     borderRadius: 30,
     alignSelf: "center",
     marginLeft: 10,
@@ -586,6 +652,7 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "600",
     marginTop: 4,
+    fontSize: 10,
   },
   dateContainer: {
     flexDirection: "row",
