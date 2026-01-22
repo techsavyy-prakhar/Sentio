@@ -66,6 +66,16 @@ export default function PollsScreen() {
   });
 
   const handleBlockUser = async (creatorDeviceId: string) => {
+    const currentDeviceId = await getDeviceId();
+    if (creatorDeviceId === currentDeviceId) {
+      Toast.show({
+        type: "info",
+        text1: "You can't block yourself",
+        text2: "This poll was created by you",
+      });
+      return;
+    }
+  
     Alert.alert(
       "Block this user?",
       "You will no longer see any polls from this user. All their existing polls will be removed from your feed.",
@@ -78,38 +88,32 @@ export default function PollsScreen() {
           text: "Block User",
           style: "destructive",
           onPress: async () => {
-            try {
-              const stored = await AsyncStorage.getItem("blockedUsers");
-              const blocked = stored ? JSON.parse(stored) : [];
-
-              if (!blocked.includes(creatorDeviceId)) {
-                const updated = [...blocked, creatorDeviceId];
-                await AsyncStorage.setItem(
-                  "blockedUsers",
-                  JSON.stringify(updated)
-                );
-                setBlockedUsers(updated);
-              }
-
-              Toast.show({
-                type: "success",
-                text1: "User blocked",
-                text2: "You will no longer see polls from this user",
-              });
-              fetchPolls();
-            } catch (error) {
-              console.error("Error blocking user:", error);
-              Toast.show({
-                type: "error",
-                text1: "Something went wrong",
-              });
+            const stored = await AsyncStorage.getItem("blockedUsers");
+            const blocked = stored ? JSON.parse(stored) : [];
+  
+            if (!blocked.includes(creatorDeviceId)) {
+              const updated = [...blocked, creatorDeviceId];
+              await AsyncStorage.setItem(
+                "blockedUsers",
+                JSON.stringify(updated)
+              );
+              setBlockedUsers(updated);
             }
+  
+            Toast.show({
+              type: "success",
+              text1: "User blocked",
+              text2: "You will no longer see polls from this user",
+            });
+  
+            fetchPolls();
           },
         },
       ],
       { cancelable: true }
     );
   };
+  
 
   const renderRightActions = (pollId: string, creatorDeviceId: string) => (
     <View
@@ -134,7 +138,7 @@ export default function PollsScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
-        onPress={() => handleReport(pollId)}
+        onPress={() => handleReport(pollId, creatorDeviceId)}
         style={styles.rightActionReport}
       >
         <Flag size={18} color="#fff" />
@@ -237,7 +241,16 @@ export default function PollsScreen() {
     }
   };
 
-  const handleReport = (pollId: string) => {
+  const handleReport = async (pollId: string, creatorDeviceId: string) => {
+    const currentDeviceId = await getDeviceId();
+    if (creatorDeviceId === currentDeviceId) {
+      Toast.show({
+        type: "info",
+        text1: "You can't report your own poll",
+        text2: "This poll was created by you",
+      });
+      return;
+    }
     Alert.alert("Report Poll", "Why are you reporting this poll?", [
       {
         text: "Inappropriate content",
