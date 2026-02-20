@@ -16,15 +16,19 @@ import { type Poll } from "@/lib/types";
 import { getDeviceId } from "../../lib/utils/deviceId";
 import { apiEndpoint } from "@/lib/config/api";
 import LoadPollSkeleton from "../../components/LoadPollSkeleton";
+import ActivePollBadge from "@/components/ActivePollBadge";
+import LottieView from "lottie-react-native";
+import LightningProgress from "@/components/LightningProgress";
 
 export default function PollDetailScreen() {
   const router = useRouter();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const [selectedVote, setSelectedVote] = useState<"yes" | "no" | null>(null);
-  const { id, hasVoted } = useLocalSearchParams<{
+  const { id, hasVoted, voteValue } = useLocalSearchParams<{
     id: string;
     hasVoted?: string;
+    voteValue?: string;
   }>();
 
   const [loading, setLoading] = useState(true);
@@ -161,8 +165,9 @@ export default function PollDetailScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.card }]}>
         <TouchableOpacity
+          hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}
           onPress={() => router.back()}
-          style={styles.backButton}
+          style={[styles.backButton]}
         >
           <ArrowLeft size={24} color={colors.text} />
         </TouchableOpacity>
@@ -181,11 +186,11 @@ export default function PollDetailScreen() {
           <View
             style={[
               styles.statusBadge,
-              { backgroundColor: `${colors.primary}20` },
+              { backgroundColor: `${colors.yesLight}` },
             ]}
           >
-            <CheckCircle size={16} color={colors.primary} />
-            <Text style={[styles.statusText, { color: colors.primary }]}>
+            <ActivePollBadge />
+            <Text style={[styles.statusText, { color: colors.yesColor }]}>
               {poll.is_active ? "Active Poll" : "Closed Poll"}
             </Text>
           </View>
@@ -201,15 +206,25 @@ export default function PollDetailScreen() {
           )}
 
           <View style={styles.statsRow}>
-            <View style={styles.statItem}>
+            <View style={[styles.statItem, { gap: 6, marginTop: 4 }]}>
               <Users size={18} color={colors.primary} />
               <Text style={[styles.statText, { color: colors.subtext }]}>
                 {poll?.total_votes?.toLocaleString()} votes
               </Text>
             </View>
             <View style={styles.statItem}>
-              <TrendingUp size={18} color={colors.primary} />
-              <Text style={[styles.statText, { color: colors.subtext }]}>
+              <LottieView
+                source={require("../../assets/lottie/flame.json")}
+                autoPlay
+                loop
+                style={{ width: 30, height: 30 }}
+              />
+              <Text
+                style={[
+                  styles.statText,
+                  { color: "#fd4e16", marginLeft: -4, marginTop: 4 },
+                ]}
+              >
                 Trending
               </Text>
             </View>
@@ -306,28 +321,38 @@ export default function PollDetailScreen() {
         ) : null}
 
         <View style={[styles.resultsCard, { backgroundColor: colors.card }]}>
-          {hasVoted == "true" && (
-            <>
-              <View style={styles.successBadge}>
-                <CheckCircle size={48} color={colors.yesColor} />
-                <Text style={[styles.successText, { color: colors.text }]}>
-                  Vote Submitted!
-                </Text>
-                <Text
-                  style={[styles.successSubtext, { color: colors.subtext }]}
-                >
-                  Thank you for participating
+          <View
+            style={{
+              marginBottom: 30,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <Text style={[styles.resultsTitle, { color: colors.text }]}>
+              Current Results
+            </Text>
+
+            {voteValue && (
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 6,
+                  backgroundColor: "#99c8ff",
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  borderRadius: 12,
+                }}
+              >
+                <Text style={[{ color: "#001ef0", fontWeight: "700" }]}>
+                  {voteValue
+                    ? `You Voted:  ${voteValue === "true" ? "Yes" : "No"}`
+                    : ""}
                 </Text>
               </View>
-              <View
-                style={[styles.divider, { backgroundColor: colors.border }]}
-              />
-            </>
-          )}
-
-          <Text style={[styles.resultsTitle, { color: colors.text }]}>
-            Current Results
-          </Text>
+            )}
+          </View>
 
           <View style={styles.resultItem}>
             <View style={styles.resultHeader}>
@@ -338,7 +363,14 @@ export default function PollDetailScreen() {
                 {yesPercentage.toFixed(1)}%
               </Text>
             </View>
-            <View
+            <LightningProgress
+              percentage={yesPercentage}
+              colors={{
+                light: colors.yesLight,
+                solid: colors.yesColor,
+              }}
+            />
+            {/* <View
               style={[styles.progressBar, { backgroundColor: colors.yesLight }]}
             >
               <View
@@ -350,7 +382,7 @@ export default function PollDetailScreen() {
                   },
                 ]}
               />
-            </View>
+            </View> */}
             <Text style={[styles.voteCount, { color: colors.subtext }]}>
               {poll?.yes_votes?.toLocaleString()} votes
             </Text>
@@ -365,19 +397,14 @@ export default function PollDetailScreen() {
                 {noPercentage.toFixed(1)}%
               </Text>
             </View>
-            <View
-              style={[styles.progressBar, { backgroundColor: colors.noLight }]}
-            >
-              <View
-                style={[
-                  styles.progressFill,
-                  {
-                    width: `${noPercentage}%`,
-                    backgroundColor: colors.noColor,
-                  },
-                ]}
-              />
-            </View>
+            <LightningProgress
+              percentage={noPercentage}
+              colors={{
+                light: colors.noLight,
+                solid: colors.noColor,
+              }}
+            />
+
             <Text style={[styles.voteCount, { color: colors.subtext }]}>
               {poll?.no_votes?.toLocaleString()} votes
             </Text>
@@ -459,12 +486,13 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: "row",
+    alignItems: "center",
     gap: 20,
   },
   statItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    justifyContent: "center",
   },
   statText: {
     fontSize: 14,
@@ -546,9 +574,8 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   resultsTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: "700",
-    marginBottom: 20,
   },
   resultItem: {
     marginBottom: 20,

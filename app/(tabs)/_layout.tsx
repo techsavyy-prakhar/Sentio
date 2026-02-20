@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { BarChart3, PlusCircle } from "lucide-react-native";
-import { useColorScheme } from "react-native";
+import { Pressable, useColorScheme, TouchableOpacity } from "react-native";
+import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 
 export default function TabLayout() {
   const colorScheme = useColorScheme();
@@ -24,11 +25,27 @@ export default function TabLayout() {
           borderTopColor: isDark ? "#2a2a2a" : "#e5e7eb",
           height: 80,
         },
+
+        tabBarButton: (props: BottomTabBarButtonProps) => (
+          <TouchableOpacity
+            onPress={props.onPress}
+            accessibilityState={props.accessibilityState}
+            accessibilityLabel={props.accessibilityLabel}
+            testID={props.testID}
+            style={props.style}
+            hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}
+            activeOpacity={0.7}
+          >
+            {props.children}
+          </TouchableOpacity>
+        ),
+
         tabBarItemStyle: {
           justifyContent: "center",
           alignItems: "center",
           paddingVertical: 8,
         },
+
         tabBarIconStyle: {
           marginBottom: 2,
         },

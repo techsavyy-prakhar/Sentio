@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { useState } from "react";
 import {
   View,
@@ -14,11 +14,13 @@ import {
   Modal,
 } from "react-native";
 import { Sparkles, CheckCircle, Info } from "lucide-react-native";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { apiEndpoint } from "@/lib/config/api";
 import Toast from "react-native-toast-message";
 import { getDeviceId } from "../../lib/utils/deviceId";
 import { contactUs } from "@/lib/utils/contactUs";
+import AIAssistButton from "@/components/AIAssistButton";
+import CategoryChips from "@/components/CategoryChips";
 
 export default function CreatePollScreen() {
   const colorScheme = useColorScheme();
@@ -28,6 +30,16 @@ export default function CreatePollScreen() {
   const [showSuccess, setShowSuccess] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [blockedModal, setBlockedModal] = useState(false);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const inputRef = useRef<TextInput>(null);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      inputRef.current?.focus();
+    }, 100);
+  
+    return () => clearTimeout(timeout);
+  }, []);
+
 
   const colors = {
     background: isDark ? "#0a0a0a" : "#f5f7fa",
@@ -39,6 +51,26 @@ export default function CreatePollScreen() {
     primary: isDark ? "#3b82f6" : "#2563eb",
     success: "#10b981",
   };
+  const params = useLocalSearchParams();
+  useEffect(() => {
+    if (!params) return;
+
+    if (params.question) {
+      setQuestion(params.question as string);
+    }
+
+    if (params.description) {
+      setDescription(params.description as string);
+    }
+
+    if (params.categories) {
+      setSelectedCategories(
+        Array.isArray(params.categories)
+          ? params.categories
+          : [params.categories]
+      );
+    }
+  }, []);
 
   const handleCreatePoll = async () => {
     if (!question.trim()) {
@@ -56,6 +88,7 @@ export default function CreatePollScreen() {
         body: JSON.stringify({
           question: question.trim(),
           description: description?.trim() || "",
+          categories: selectedCategories,
           device_id: await getDeviceId(),
         }),
       });
@@ -73,14 +106,10 @@ export default function CreatePollScreen() {
         });
         return;
       }
-
-      // 🚫 BLOCKED DEVICE (403)
       if (response.status === 403) {
         setBlockedModal(true);
         return;
       }
-
-      // ❌ OTHER ERRORS (400, 409, etc.)
       if (!response.ok) {
         Toast.show({
           type: "error",
@@ -90,7 +119,6 @@ export default function CreatePollScreen() {
         return;
       }
 
-      // ✅ SUCCESS
       Toast.show({
         type: "success",
         text1: "Poll created",
@@ -99,6 +127,7 @@ export default function CreatePollScreen() {
 
       setQuestion("");
       setDescription("");
+      setSelectedCategories([]);
       router.replace("/");
     } catch (error) {
       console.error("Error creating poll:", error);
@@ -189,6 +218,9 @@ export default function CreatePollScreen() {
             </Text>
           </View>
         </View>
+        <View style={{ position: "absolute", right: 35, top: 70 }}>
+          <AIAssistButton />
+        </View>
       </View>
 
       <ScrollView
@@ -212,6 +244,7 @@ export default function CreatePollScreen() {
               <Text style={{ color: colors.primary }}> *</Text>
             </Text>
             <TextInput
+              ref={inputRef}
               style={[
                 styles.input,
                 styles.questionInput,
@@ -226,6 +259,7 @@ export default function CreatePollScreen() {
               value={question}
               onChangeText={setQuestion}
               multiline
+
               maxLength={200}
               editable={!isSubmitting}
             />
@@ -265,41 +299,19 @@ export default function CreatePollScreen() {
             </Text>
           </View>
 
-          <View style={styles.previewSection}>
-            <Text style={[styles.previewTitle, { color: colors.text }]}>
-              Vote Options
+          <View>
+            <Text style={[styles.label, { color: colors.text }]}>
+              Categories*{" "}
+              <Text style={{ fontStyle: "italic", fontSize: 10 }}>
+                (Select up to 3)
+              </Text>
             </Text>
-            <View style={styles.optionsPreview}>
-              <View
-                style={[
-                  styles.optionBadge,
-                  { backgroundColor: `${colors.success}20` },
-                ]}
-              >
-                <CheckCircle size={16} color={colors.success} />
-                <Text
-                  style={[
-                    styles.optionText,
-                    { color: isDark ? colors.success : "#059669" },
-                  ]}
-                >
-                  Yes
-                </Text>
-              </View>
-              <View
-                style={[styles.optionBadge, { backgroundColor: "#ef444420" }]}
-              >
-                <CheckCircle size={16} color={isDark ? "#ef4444" : "#dc2626"} />
-                <Text
-                  style={[
-                    styles.optionText,
-                    { color: isDark ? "#ef4444" : "#dc2626" },
-                  ]}
-                >
-                  No
-                </Text>
-              </View>
-            </View>
+
+            <CategoryChips
+              mode="create"
+              selectedCategory={selectedCategories}
+              setSelectedCategory={setSelectedCategories}
+            />
           </View>
         </View>
 
@@ -380,11 +392,16 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingHorizontal: 20,
     paddingBottom: 20,
+    flexDirection: "row",
   },
   headerContent: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
+  },
+  subtext: {
+    fontSize: 12,
+    marginBottom: 8,
   },
   headerTitle: {
     fontSize: 32,
@@ -423,9 +440,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 3,
   },
-  inputGroup: {
-    marginBottom: 24,
-  },
+  inputGroup: {},
   label: {
     fontSize: 16,
     fontWeight: "600",

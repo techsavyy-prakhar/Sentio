@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sentio",
     "slug": "sentio",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/images/sentio_icon.png",
@@ -14,7 +14,7 @@
       "backgroundColor": "#2e3c3c"
     },
     "ios": {
-      "buildNumber": "2",
+      "buildNumber": "8",
       "supportsTablet": true,
       "bundleIdentifier": "com.prakharaggarwal.sentio",
       "icon": "./assets/images/sentio_icon.png",

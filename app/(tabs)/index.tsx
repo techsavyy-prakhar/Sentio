@@ -12,7 +12,7 @@ import {
 import Toast from "react-native-toast-message";
 import { apiEndpoint } from "@/lib/config/api";
 
-import { useFocusEffect, useRouter } from "expo-router";
+import { router, useFocusEffect, useRouter } from "expo-router";
 import { Clock, CheckCircle, TrendingUp, Contact } from "lucide-react-native";
 import { type Poll } from "@/lib/types";
 import { getDeviceId } from "../../lib/utils/deviceId";
@@ -22,99 +22,37 @@ import { Alert } from "react-native";
 import { Eye, Flag, X } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { contactUs } from "@/lib/utils/contactUs";
+import CategoryChips from "@/components/CategoryChips";
 
 export default function PollsScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
-  const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [polls, setPolls] = useState<
-    (Poll & { yes_votes: number; no_votes: number; total_votes: number })[]
-  >([]);
+  const [polls, setPolls] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [hiddenPolls, setHiddenPolls] = useState<string[]>([]);
-  const [blockedUsers, setBlockedUsers] = useState<string[]>([]);
-  useEffect(() => {
-    const loadBlockedUsers = async () => {
-      const stored = await AsyncStorage.getItem("blockedUsers");
-      if (stored) {
-        setBlockedUsers(JSON.parse(stored));
-      }
-    };
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [deviceId, setDeviceId] = useState<string>("");
 
-    loadBlockedUsers();
-  }, []);
+  const [selectedCategory, setSelectedCategory] = useState(["All"]);
+  const [hasNewPolls, setHasNewPolls] = useState(false);
+  const [latestData, setLatestData] = useState<any[]>([]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchPolls();
-    }, [])
-  );
-  const filteredPolls = polls.filter((poll) => {
-    if (!searchQuery.trim()) return true;
-
-    const queryWords = searchQuery.toLowerCase().split(/\s+/);
-
-    const searchableText = (
-      poll.question +
-      " " +
-      (poll.description ?? "")
-    ).toLowerCase();
-
-    return queryWords.some((word) => searchableText.includes(word));
-  });
-
-  const handleBlockUser = async (creatorDeviceId: string) => {
-    const currentDeviceId = await getDeviceId();
-    if (creatorDeviceId === currentDeviceId) {
-      Toast.show({
-        type: "info",
-        text1: "You can't block yourself",
-        text2: "This poll was created by you",
-      });
-      return;
-    }
-  
-    Alert.alert(
-      "Block this user?",
-      "You will no longer see any polls from this user. All their existing polls will be removed from your feed.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Block User",
-          style: "destructive",
-          onPress: async () => {
-            const stored = await AsyncStorage.getItem("blockedUsers");
-            const blocked = stored ? JSON.parse(stored) : [];
-  
-            if (!blocked.includes(creatorDeviceId)) {
-              const updated = [...blocked, creatorDeviceId];
-              await AsyncStorage.setItem(
-                "blockedUsers",
-                JSON.stringify(updated)
-              );
-              setBlockedUsers(updated);
-            }
-  
-            Toast.show({
-              type: "success",
-              text1: "User blocked",
-              text2: "You will no longer see polls from this user",
-            });
-  
-            fetchPolls();
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+  const feedCache = useRef<Record<string, any[]>>({});
+  const colors = {
+    background: isDark ? "#0a0a0a" : "#f5f7fa",
+    card: isDark ? "#1a1a1a" : "#ffffff",
+    text: isDark ? "#ffffff" : "#1f2937",
+    subtext: isDark ? "#9ca3af" : "#6b7280",
+    border: isDark ? "#2a2a2a" : "#e5e7eb",
+    active: isDark ? "#10b981" : "#059669",
+    inactive: isDark ? "#ef4444" : "#dc2626",
+    primary: isDark ? "#3b82f6" : "#2563eb",
+    progressBg: isDark ? "#374151" : "#e5e7eb",
+    yesColor: "#10b981",
+    noColor: "#ef4444",
   };
-  
-
   const renderRightActions = (pollId: string, creatorDeviceId: string) => (
     <View
       style={{
@@ -133,10 +71,9 @@ export default function PollsScreen() {
         <Text
           style={[styles.actionText, { fontSize: 10, textAlign: "center" }]}
         >
-          Remove from feed
+          Remove from feed{" "}
         </Text>
       </TouchableOpacity>
-
       <TouchableOpacity
         onPress={() => handleReport(pollId, creatorDeviceId)}
         style={styles.rightActionReport}
@@ -157,93 +94,19 @@ export default function PollsScreen() {
       </TouchableOpacity>
     </View>
   );
-
-  const colors = {
-    background: isDark ? "#0a0a0a" : "#f5f7fa",
-    card: isDark ? "#1a1a1a" : "#ffffff",
-    text: isDark ? "#ffffff" : "#1f2937",
-    subtext: isDark ? "#9ca3af" : "#6b7280",
-    border: isDark ? "#2a2a2a" : "#e5e7eb",
-    active: isDark ? "#10b981" : "#059669",
-    inactive: isDark ? "#ef4444" : "#dc2626",
-    primary: isDark ? "#3b82f6" : "#2563eb",
-    progressBg: isDark ? "#374151" : "#e5e7eb",
-    yesColor: "#10b981",
-    noColor: "#ef4444",
-  };
-
-  useEffect(() => {
-    fetchPolls();
-  }, []);
-  const getHiddenPolls = async (): Promise<string[]> => {
-    try {
-      const stored = await AsyncStorage.getItem("hiddenPolls");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
-    }
-  };
-  const fetchPolls = async () => {
-    setLoading(true);
-
-    const response = await fetch(apiEndpoint("/polls/"));
-    const data = await response.json();
-
-    const storedBlocked = await AsyncStorage.getItem("blockedUsers");
-    const blockedUsers = storedBlocked ? JSON.parse(storedBlocked) : [];
-
-    const storedHidden = await AsyncStorage.getItem("hiddenPolls");
-    const hiddenPolls = storedHidden ? JSON.parse(storedHidden) : [];
-
-    const filtered = data.filter(
-      (poll: Poll) =>
-        !blockedUsers.includes(poll.creator_device_id) &&
-        !hiddenPolls.includes(poll.id)
-    );
-
-    setPolls(filtered);
-    setLoading(false);
-  };
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await fetchPolls();
-    setRefreshing(false);
-  };
-
-  const handlePollPress = async (poll: Poll) => {
-    try {
-      const deviceId = await getDeviceId();
-
-      const res = await fetch(apiEndpoint(`/polls/${poll.id}/vote/`), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          device_id: deviceId,
-        }),
-      });
-
-      const data = await res.json();
-      router.push({
-        pathname: "/poll/[id]",
-        params: {
-          id: poll.id,
-          hasVoted: data.has_voted == undefined ? "false" : data.has_voted,
-        },
-      });
-    } catch (err) {
-      Toast.show({
-        type: "error",
-        text1: "Something went wrong",
-      });
-    }
-  };
+  const filteredPolls = polls.filter((poll) => {
+    if (!searchQuery.trim()) return true;
+    const queryWords = searchQuery.toLowerCase().split(/\s+/);
+    const searchableText = (
+      poll.question +
+      " " +
+      (poll.description ?? "")
+    ).toLowerCase();
+    return queryWords.some((word) => searchableText.includes(word));
+  });
 
   const handleReport = async (pollId: string, creatorDeviceId: string) => {
-    const currentDeviceId = await getDeviceId();
-    if (creatorDeviceId === currentDeviceId) {
+    if (creatorDeviceId === deviceId) {
       Toast.show({
         type: "info",
         text1: "You can't report your own poll",
@@ -251,52 +114,248 @@ export default function PollsScreen() {
       });
       return;
     }
-    Alert.alert("Report Poll", "Why are you reporting this poll?", [
-      {
-        text: "Inappropriate content",
-        onPress: async () => {
-          try {
-            const response = await fetch(
-              apiEndpoint(`/polls/${pollId}/report/`),
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  device_id: await getDeviceId(),
-                  reason: "inappropriate_content",
-                }),
+
+    Alert.alert(
+      "Report Poll",
+      "Why are you reporting this poll?",
+      [
+        {
+          text: "Inappropriate content",
+          onPress: async () => {
+            try {
+              const response = await fetch(
+                apiEndpoint(`/polls/${pollId}/report/`),
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    device_id: deviceId,
+                    reason: "inappropriate_content",
+                  }),
+                }
+              );
+
+              if (response.status === 409) {
+                Toast.show({
+                  type: "error",
+                  text1: "You already reported this poll",
+                });
+                return;
               }
-            );
-            if (response.status === 409) {
-              Toast.show({
-                type: "error",
-                text1: "You already reported this poll",
-              });
-            } else {
+
+              if (!response.ok) {
+                Toast.show({
+                  type: "error",
+                  text1: "Failed to report poll",
+                });
+                return;
+              }
+
               Toast.show({
                 type: "success",
                 text1: "Poll reported",
               });
+            } catch (err) {
+              Toast.show({
+                type: "error",
+                text1: "Network error",
+                text2: "Please try again later",
+              });
             }
-          } catch (err) {
+          },
+        },
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+      ],
+      { cancelable: true }
+    );
+  };
+
+  const getActiveCategory = () => {
+    return selectedCategory.length > 0 && !selectedCategory.includes("All")
+      ? selectedCategory[0]
+      : "All";
+  };
+
+  const applyLocalFilters = (data: any[]) => {
+    return data.filter((poll) => !hiddenPolls.includes(poll.id));
+  };
+
+  useEffect(() => {
+    const init = async () => {
+      const id = await getDeviceId();
+      setDeviceId(id);
+      const storedHidden = await AsyncStorage.getItem("hiddenPolls");
+      setHiddenPolls(storedHidden ? JSON.parse(storedHidden) : []);
+    };
+
+    init();
+  }, []);
+
+  useEffect(() => {
+    if (!deviceId) return;
+    loadPolls();
+  }, [deviceId, selectedCategory, hiddenPolls]);
+  const loadPolls = async () => {
+    const category = getActiveCategory();
+    if (feedCache.current[category]) {
+      const filtered = applyLocalFilters(feedCache.current[category]);
+      setPolls(filtered);
+      fetchFromServer(category, false);
+      return;
+    }
+
+    setLoading(true);
+    await fetchFromServer(category, true);
+  };
+
+  const fetchFromServer = async (category: string, showLoader = true) => {
+    try {
+      let query =
+        category !== "All" ? `?category=${encodeURIComponent(category)}` : "";
+      deviceId && (query += `${query ? "&" : "?"}device_id=${deviceId}`);
+
+      const response = await fetch(apiEndpoint(`/polls/${query}`));
+      if (!response.ok) {
+        const text = await response.text();
+        console.log("Server error response:", text);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (!feedCache.current[category]) {
+        feedCache.current[category] = data;
+        setPolls(applyLocalFilters(data));
+        return;
+      }
+
+      if (data.length > feedCache.current[category].length) {
+        setLatestData(data);
+        setHasNewPolls(true);
+        return;
+      }
+    } catch (err) {
+      console.log("Fetch error:", err);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  };
+
+  /* =========================
+   REFRESH
+========================= */
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+
+    const category = getActiveCategory();
+    await fetchFromServer(category, false);
+
+    setRefreshing(false);
+  };
+  const handleBlockUser = async (creatorDeviceId: string) => {
+    if (creatorDeviceId === deviceId) {
+      Toast.show({
+        type: "info",
+        text1: "You can't block yourself",
+      });
+      return;
+    }
+
+    Alert.alert("Block this user?", "You will no longer see their polls.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Block",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await fetch(apiEndpoint("/block-user/"), {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                blocker_device_id: deviceId,
+                blocked_device_id: creatorDeviceId,
+              }),
+            });
+
+            setPolls((prev) =>
+              prev.filter((poll) => poll.creator_device_id !== creatorDeviceId)
+            );
+            feedCache.current = {};
+
+            Toast.show({
+              type: "success",
+              text1: "User blocked",
+            });
+            loadPolls();
+          } catch {
             Toast.show({
               type: "error",
-              text1: "Failed to report poll",
+              text1: "Failed to block user",
             });
           }
         },
       },
-      { text: "Cancel", style: "cancel" },
     ]);
+  };
+
+  const handlePollHide = async (pollId: string) => {
+    const updated = [...hiddenPolls, pollId];
+
+    await AsyncStorage.setItem("hiddenPolls", JSON.stringify(updated));
+
+    setHiddenPolls(updated);
+
+    setPolls((prev) => prev.filter((poll) => poll.id !== pollId));
+  };
+
+  /* =========================
+   NAVIGATION LOCK
+========================= */
+
+  const handlePollPress = async (poll: any) => {
+    if (isNavigating) return;
+
+    setIsNavigating(true);
+
+    try {
+      const res = await fetch(apiEndpoint(`/polls/${poll.id}/vote/`), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ device_id: deviceId }),
+      });
+
+      const data = await res.json();
+      
+
+      router.push({
+        pathname: "/poll/[id]",
+        params: {
+          id: poll.id,
+          hasVoted: data.has_voted === undefined ? "false" : data.has_voted,
+          voteValue: data.vote_value ? data.vote_value : null,
+        },
+      });
+    } catch (err) {
+      Toast.show({
+        type: "error",
+        text1: "Something went wrong",
+      });
+    } finally {
+      setIsNavigating(false);
+    }
   };
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
     if (diffDays === 0) return "Today";
     if (diffDays === 1) return "Yesterday";
@@ -332,28 +391,32 @@ export default function PollsScreen() {
         >
           <View style={styles.pollHeader}>
             <View
-              style={[
-                styles.statusBadge,
-                {
-                  backgroundColor: poll.is_active
-                    ? `${colors.active}20`
-                    : `${colors.inactive}20`,
-                },
-              ]}
+              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
             >
-              {poll.is_active ? (
-                <CheckCircle size={14} color={colors.active} />
-              ) : (
-                <Clock size={14} color={colors.inactive} />
-              )}
-              <Text
+              <View
                 style={[
-                  styles.statusText,
-                  { color: poll.is_active ? colors.active : colors.inactive },
+                  styles.statusBadge,
+                  {
+                    backgroundColor: poll.is_active
+                      ? `${colors.active}20`
+                      : `${colors.inactive}20`,
+                  },
                 ]}
               >
-                {poll.is_active ? "Active" : "Closed"}
-              </Text>
+                {poll.is_active ? (
+                  <CheckCircle size={14} color={colors.active} />
+                ) : (
+                  <Clock size={14} color={colors.inactive} />
+                )}
+                <Text
+                  style={[
+                    styles.statusText,
+                    { color: poll.is_active ? colors.active : colors.inactive },
+                  ]}
+                >
+                  {poll.is_active ? "Active" : "Closed"}
+                </Text>
+              </View>
             </View>
             <View style={styles.dateContainer}>
               <Clock size={12} color={colors.subtext} />
@@ -454,32 +517,6 @@ export default function PollsScreen() {
     );
   };
 
-  if (loading) {
-    return (
-      <View
-        style={[
-          styles.container,
-          styles.centerContent,
-          { backgroundColor: colors.background },
-        ]}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
-    );
-  }
-  const handlePollHide = async (pollId: string) => {
-    setPolls((prev) => prev.filter((poll) => poll.id !== pollId));
-
-    const stored = await AsyncStorage.getItem("hiddenPolls");
-    const hidden = stored ? JSON.parse(stored) : [];
-
-    if (!hidden.includes(pollId)) {
-      const updated = [...hidden, pollId];
-      await AsyncStorage.setItem("hiddenPolls", JSON.stringify(updated));
-      setHiddenPolls(updated);
-    }
-  };
-
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[{ flexDirection: "row", justifyContent: "space-between" }]}>
@@ -530,8 +567,39 @@ export default function PollsScreen() {
           clearButtonMode="while-editing"
         />
       </View>
+      <View style={{ marginHorizontal: 20, marginBottom: 12 }}>
+        <CategoryChips
+          mode="feed"
+          setSelectedCategory={setSelectedCategory}
+          selectedCategory={selectedCategory}
+        />
+      </View>
+      {hasNewPolls && (
+        <TouchableOpacity
+          style={{
+            backgroundColor: "#2563eb",
+            padding: 10,
+            marginBottom: 10,
+            alignItems: "center",
+          }}
+          onPress={() => {
+            const category = getActiveCategory();
+            feedCache.current[category] = latestData;
+            setPolls(applyLocalFilters(latestData));
+            setHasNewPolls(false);
+          }}
+        >
+          <Text style={{ color: "#fff", fontWeight: "600" }}>
+            New polls available • Tap to refresh
+          </Text>
+        </TouchableOpacity>
+      )}
 
-      {filteredPolls.length === 0 ? (
+      {loading ? (
+        <View style={[styles.centerContent, { flex: 1 }]}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : filteredPolls.length === 0 ? (
         <View
           style={[styles.emptyState, { backgroundColor: colors.background }]}
         >
@@ -634,6 +702,16 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     gap: 6,
   },
+  ownerStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+    backgroundColor: "#efd71d",
+    opacity: 0.4,
+  },
   statusText: {
     fontSize: 12,
     fontWeight: "600",
@@ -690,7 +768,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#e0e0e0",
     borderRadius: 6,
     overflow: "hidden",
-    flexDirection: "row", // 👈 IMPORTANT
+    flexDirection: "row",
   },
   progressBar: {
     height: 8,
@@ -700,7 +778,6 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: "100%",
-    borderRadius: 4,
   },
   voteStats: {
     flexDirection: "row",
