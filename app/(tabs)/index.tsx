@@ -23,6 +23,7 @@ import { Eye, Flag, X } from "lucide-react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { contactUs } from "@/lib/utils/contactUs";
 import CategoryChips from "@/components/CategoryChips";
+import PollCard from "@/components/PollCard";
 
 export default function PollsScreen() {
   const colorScheme = useColorScheme();
@@ -318,39 +319,6 @@ export default function PollsScreen() {
    NAVIGATION LOCK
 ========================= */
 
-  const handlePollPress = async (poll: any) => {
-    if (isNavigating) return;
-
-    setIsNavigating(true);
-
-    try {
-      const res = await fetch(apiEndpoint(`/polls/${poll.id}/vote/`), {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ device_id: deviceId }),
-      });
-
-      const data = await res.json();
-      
-
-      router.push({
-        pathname: "/poll/[id]",
-        params: {
-          id: poll.id,
-          hasVoted: data.has_voted === undefined ? "false" : data.has_voted,
-          voteValue: data.vote_value ? data.vote_value : null,
-        },
-      });
-    } catch (err) {
-      Toast.show({
-        type: "error",
-        text1: "Something went wrong",
-      });
-    } finally {
-      setIsNavigating(false);
-    }
-  };
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -361,160 +329,6 @@ export default function PollsScreen() {
     if (diffDays === 1) return "Yesterday";
     if (diffDays < 7) return `${diffDays} days ago`;
     return date.toLocaleDateString();
-  };
-
-  const PollCard = ({
-    poll,
-  }: {
-    poll: Poll & {
-      yes_votes: number;
-      no_votes: number;
-      total_votes: number;
-    };
-  }) => {
-    const yesPercentage =
-      poll.total_votes > 0 ? (poll.yes_votes / poll.total_votes) * 100 : 0;
-    const noPercentage =
-      poll.total_votes > 0 ? (poll.no_votes / poll.total_votes) * 100 : 0;
-
-    return (
-      <Swipeable
-        renderRightActions={() =>
-          renderRightActions(poll.id, poll.creator_device_id!)
-        }
-      >
-        <TouchableOpacity
-          style={[styles.pollCard, { backgroundColor: colors.card }]}
-          onPress={() => handlePollPress(poll)}
-          activeOpacity={poll.is_active ? 0.7 : 1}
-          disabled={!poll.is_active}
-        >
-          <View style={styles.pollHeader}>
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            >
-              <View
-                style={[
-                  styles.statusBadge,
-                  {
-                    backgroundColor: poll.is_active
-                      ? `${colors.active}20`
-                      : `${colors.inactive}20`,
-                  },
-                ]}
-              >
-                {poll.is_active ? (
-                  <CheckCircle size={14} color={colors.active} />
-                ) : (
-                  <Clock size={14} color={colors.inactive} />
-                )}
-                <Text
-                  style={[
-                    styles.statusText,
-                    { color: poll.is_active ? colors.active : colors.inactive },
-                  ]}
-                >
-                  {poll.is_active ? "Active" : "Closed"}
-                </Text>
-              </View>
-            </View>
-            <View style={styles.dateContainer}>
-              <Clock size={12} color={colors.subtext} />
-              <Text style={[styles.dateText, { color: colors.subtext }]}>
-                {formatDate(poll.created_at)}
-              </Text>
-            </View>
-          </View>
-
-          <Text style={[styles.question, { color: colors.text }]}>
-            {poll.question}
-          </Text>
-
-          <View style={styles.resultsContainer}>
-            <View
-              style={[
-                styles.progressBar,
-                { backgroundColor: colors.progressBg },
-              ]}
-            >
-              <View style={styles.progressContainer}>
-                {/* YES */}
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${yesPercentage}%`,
-                      backgroundColor: colors.yesColor,
-                    },
-                  ]}
-                />
-
-                {/* NO */}
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width: `${noPercentage}%`,
-                      backgroundColor: colors.noColor,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-
-            <View style={styles.voteStats}>
-              <View style={styles.voteStat}>
-                <View style={styles.voteLabel}>
-                  <View
-                    style={[
-                      styles.colorDot,
-                      { backgroundColor: colors.yesColor },
-                    ]}
-                  />
-                  <Text style={[styles.voteText, { color: colors.text }]}>
-                    Yes
-                  </Text>
-                </View>
-                <Text style={[styles.votePercentage, { color: colors.text }]}>
-                  {yesPercentage.toFixed(1)}%
-                </Text>
-              </View>
-
-              <View style={styles.voteStat}>
-                <View style={styles.voteLabel}>
-                  <View
-                    style={[
-                      styles.colorDot,
-                      { backgroundColor: colors.noColor },
-                    ]}
-                  />
-                  <Text style={[styles.voteText, { color: colors.text }]}>
-                    No
-                  </Text>
-                </View>
-                <Text style={[styles.votePercentage, { color: colors.text }]}>
-                  {noPercentage.toFixed(1)}%
-                </Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={[styles.footer, { borderTopColor: colors.border }]}>
-            <View style={styles.totalVotes}>
-              <TrendingUp size={14} color={colors.primary} />
-              <Text style={[styles.totalVotesText, { color: colors.subtext }]}>
-                {poll?.total_votes?.toLocaleString()} votes
-              </Text>
-            </View>
-            {poll.is_active && (
-              <Text style={[styles.tapHint, { color: colors.primary }]}>
-                Tap to vote
-              </Text>
-            )}
-          </View>
-        </TouchableOpacity>
-      </Swipeable>
-    );
   };
 
   return (
@@ -620,7 +434,22 @@ export default function PollsScreen() {
           }
         >
           {filteredPolls.map((poll) => (
-            <PollCard key={poll.id} poll={poll} />
+            <PollCard
+              key={poll.id}
+              yes_votes={poll.yes_votes}
+              no_votes={poll.no_votes}
+              renderRightActions={renderRightActions}
+              id={poll.id}
+              title={poll.question}
+              creatorDeviceId={poll.creator_device_id}
+              totalVotes={poll.total_votes}
+              options={[
+                { id: "opt_yes", label: "Yes", votes: 5517 }, 
+                { id: "opt_no",  label: "No",  votes: 2717 }, 
+              ]}
+              question={poll.description}
+              category={selectedCategory[0]}
+            />
           ))}
         </ScrollView>
       )}

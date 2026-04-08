@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "799289119085",
+    "project_id": "sentio-vote",
+    "storage_bucket": "sentio-vote.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:799289119085:android:8ad87ccbb4a3dd24774a64",
+        "android_client_info": {
+          "package_name": "com.prakharaggarwal.sentio"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC2JfkzubfhBWnhEQ_fj8zM3EjhyLJZleo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

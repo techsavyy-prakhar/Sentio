@@ -19,11 +19,15 @@
       "bundleIdentifier": "com.prakharaggarwal.sentio",
       "icon": "./assets/images/sentio_icon.png",
       "infoPlist": {
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true
+        },
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.prakharaggarwal.sentio",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/sentio_icon.png",
         "backgroundColor": "#ffffff"

@@ -1,6 +1,15 @@
 import { Tabs } from "expo-router";
-import { BarChart3, PlusCircle } from "lucide-react-native";
-import { Pressable, useColorScheme, TouchableOpacity } from "react-native";
+import {
+  BarChart3,
+  Newspaper,
+  Plus,
+  User,
+} from "lucide-react-native";
+import {
+  TouchableOpacity,
+  View,
+  useColorScheme,
+} from "react-native";
 import type { BottomTabBarButtonProps } from "@react-navigation/bottom-tabs";
 
 export default function TabLayout() {
@@ -11,76 +20,107 @@ export default function TabLayout() {
     primary: isDark ? "#3b82f6" : "#2563eb",
     inactive: isDark ? "#6b7280" : "#9ca3af",
     tabBar: isDark ? "#1a1a1a" : "#f8f9fa",
+    border: isDark ? "#2a2a2a" : "#e5e7eb",
   };
 
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBarShowLabel: true,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.inactive,
         tabBarStyle: {
           backgroundColor: colors.tabBar,
+          borderTopColor: colors.border,
           borderTopWidth: 1,
-          borderTopColor: isDark ? "#2a2a2a" : "#e5e7eb",
           height: 80,
         },
-
-        tabBarButton: (props: BottomTabBarButtonProps) => (
-          <TouchableOpacity
-            onPress={props.onPress}
-            accessibilityState={props.accessibilityState}
-            accessibilityLabel={props.accessibilityLabel}
-            testID={props.testID}
-            style={props.style}
-            hitSlop={{ top: 30, bottom: 30, left: 30, right: 30 }}
-            activeOpacity={0.7}
-          >
-            {props.children}
-          </TouchableOpacity>
-        ),
-
-        tabBarItemStyle: {
-          justifyContent: "center",
-          alignItems: "center",
-          paddingVertical: 8,
-        },
-
-        tabBarIconStyle: {
-          marginBottom: 2,
-        },
-
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: "600",
         },
       }}
     >
+      {/* POLLS */}
       <Tabs.Screen
         name="index"
         options={{
           title: "Polls",
-          tabBarItemStyle: {
-            borderRightWidth: 2,
-            borderRightColor: isDark ? "#2a2a2a" : "#e5e7eb",
-            marginTop: 8,
-          },
-
-          tabBarIcon: ({ size, color }) => (
+          tabBarIcon: ({ color, size }) => (
             <BarChart3 size={size} color={color} />
           ),
         }}
       />
 
+      {/* NEWS */}
       <Tabs.Screen
+        name="news"
+        options={{
+          title: "News",
+          tabBarIcon: ({ color, size }) => (
+            <Newspaper size={size} color={color} />
+          ),
+        }}
+      />
+
+      {/* CENTER + BUTTON */}
+      {/* <Tabs.Screen
         name="create"
         options={{
-          title: "Create",
-          tabBarIcon: ({ size, color }) => (
-            <PlusCircle size={size} color={color} />
+          title: "",
+          tabBarButton: (props) => (
+            <CenterCreateButton {...props} color={colors.primary} />
+          ),
+        }}
+      /> */}
+
+      {/* PROFILE */}
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: "Profile",
+          tabBarIcon: ({ color, size }) => (
+            <User size={size} color={color} />
           ),
         }}
       />
     </Tabs>
+  );
+}
+
+/* ---------- CENTER BUTTON ---------- */
+function CenterCreateButton({
+  onPress,
+  color,
+}: BottomTabBarButtonProps & { color: string }) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.85}
+      style={{
+        top: -25,
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <View
+        style={{
+          width: 64,
+          height: 64,
+          borderRadius: 32,
+          backgroundColor: color,
+          justifyContent: "center",
+          alignItems: "center",
+          elevation: 6,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 6,
+        }}
+      >
+        <Plus size={32} color="#fff" />
+      </View>
+    </TouchableOpacity>
   );
 }
