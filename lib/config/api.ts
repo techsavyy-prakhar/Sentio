@@ -1,4 +1,5 @@
-export const API_URL = "https://sentio-backend.onrender.com/api";
+// export const API_URL = "https://sentio-backend.onrender.com/api";
+export const API_URL = "http://13.233.43.31/api";
 // export const API_URL = "http://127.0.0.1:8000/api";
 // export const API_URL = "http://192.168.1.3:8000/api";
 
