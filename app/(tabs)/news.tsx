@@ -11,11 +11,8 @@ import { useRouter } from "expo-router";
 
 import { CategorySelector } from "../../components/CategorySelecter";
 import { TopicCard } from "@/components/TopicCard";
-// import { BottomNavigation } from '@/components/BottomNavigation';
+import { Colors } from "@/constants/Colors";
 
-/* =====================
-Types
-===================== */
 type Importance = "High" | "Medium";
 
 type Topic = {
@@ -29,21 +26,19 @@ type Topic = {
   isFollowing: boolean;
 };
 
-/* =====================
-   Screen
-===================== */
 export default function TopicsListScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
+  const baseColors = Colors[isDark ? "dark" : "light"];
   const colors = {
-    background: isDark ? "#0a0a0a" : "#f5f7fa",
-    card: isDark ? "#1a1a1a" : "#ffffff",
-    text: isDark ? "#ffffff" : "#1f2937",
-    subtext: isDark ? "#9ca3af" : "#6b7280",
-    border: isDark ? "#2a2a2a" : "#e5e7eb",
-    active: isDark ? "#10b981" : "#059669",
-    inactive: isDark ? "#ef4444" : "#dc2626",
-    primary: isDark ? "#3b82f6" : "#2563eb",
+    background: baseColors.background,
+    card: baseColors.surface,
+    text: baseColors.text,
+    subtext: baseColors.subtext,
+    border: baseColors.border,
+    active: baseColors.success,
+    inactive: baseColors.error,
+    primary: baseColors.primary,
     progressBg: isDark ? "#374151" : "#e5e7eb",
     yesColor: "#10b981",
     noColor: "#ef4444",
@@ -136,16 +131,14 @@ export default function TopicsListScreen() {
   };
 
   return (
-    <View style={[styles.container, {}]}>
-      <View style={[{ flexDirection: "row", justifyContent: "space-between" }]}>
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: colors.text }]}>
-            Current Affairs Vault
-          </Text>
-          <Text style={[styles.headerSubtitle, { color: colors.subtext }]}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Current Affairs Vault
+        </Text>
+        <Text style={[styles.headerSubtitle, { color: colors.subtext }]}>
           Real-time updates on the topics that matter
-          </Text>
-        </View>
+        </Text>
       </View>
       <CategorySelector
         categories={categories}
@@ -188,24 +181,26 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
   },
   contactUsHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingHorizontal: 24,
+    paddingBottom: 24,
   },
   headerTitle: {
     fontSize: 32,
     fontWeight: "700",
-    marginBottom: 4,
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
   headerSubtitle: {
-    fontSize: 16,
+    fontSize: 14,
+    letterSpacing: 0.3,
   },
   scrollView: {
     flex: 1,

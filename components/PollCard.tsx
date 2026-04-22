@@ -114,6 +114,7 @@ const OptionRow: React.FC<OptionRowProps> = ({
 }) => {
   const progress = useSharedValue(0);
   const rowScale = useSharedValue(1);
+  console.log("I am logging the value of hasVoted", hasVoted);
 
   useEffect(() => {
     if (hasVoted) {
@@ -296,6 +297,7 @@ const PollCard: React.FC<PollCardProps> = ({
           device_id: deviceId,
         }),
       });
+      console.log("Logging the response of the handleSubmit fetch call: ", deviceId);
 
       if (!response.ok) {
         const error = await response.json();
